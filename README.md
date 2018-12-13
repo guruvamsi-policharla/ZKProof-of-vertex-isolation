@@ -5,4 +5,4 @@ Use: $ gcc -o foo foo.c -I ~/.local/include/pbc -L ~/.local/lib -Wl,-rpath ~/.lo
 
 If using the C++ wrapper by Aniket Kate use:
 
-$ g++ -g -static -o Testing Testing.o libPBC.a -lpbc -lgmp
+$ g++ -g -o main main.cpp libPBC.a -lpbc -lgmpxx -lgmp
