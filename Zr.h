@@ -19,6 +19,9 @@ public:
   //Create an element from long int  
   Zr(const Pairing &e, long int i);
 
+  //Create an element from long int  
+  Zr(const Pairing &e, mpz_t i);
+
   //Create an element from import 
   //Traditional Import, bool is not imported
   Zr(const Pairing &e, const unsigned char *data, 

@@ -6,7 +6,6 @@
 using namespace std;
 
 //Function Prototypes
-mpz_class* getPrimes(int);
 
 //Global variables
 
@@ -31,7 +30,8 @@ mpz_class* getPrimes(int n)
       *(prime_arr)=2;
   }
 
-  unsigned int i=3,count,c;
+  mpz_class i = 3,c;
+  unsigned int count;
   bool isPrime;
 
   for(count = 1; count < n; i++)
@@ -51,8 +51,9 @@ mpz_class* getPrimes(int n)
       *(prime_arr + count-1) = i;
     }
 
-    }
-    return prime_arr;
+  }
+
+  return prime_arr;
 }
 
 bool edgeCompare(struct edge edge_1,struct edge edge_2)
@@ -64,7 +65,8 @@ bool edgeCompare(struct edge edge_1,struct edge edge_2)
     return false;
 }
 
-bool edgePresent(const struct edge* edge_list, unsigned int ecount, struct edge new_edge)
+bool edgePresent(const struct edge *edge_list, unsigned int ecount,
+  struct edge new_edge)
 {
   //Checks whether an edge is present in the array edge_list
   for(unsigned int i = 0; i < ecount; i++)
@@ -77,7 +79,7 @@ bool edgePresent(const struct edge* edge_list, unsigned int ecount, struct edge 
 }
 
 struct edge* genSubgraph(const unsigned int vertices, const unsigned int edges,
-  const mpz_class* prime_arr, unsigned int vShift)
+  const mpz_class *prime_arr, unsigned int vShift)
 {
   //Generates random edges with given number of vertices and edges
   //Initialising prng
@@ -117,22 +119,22 @@ struct edge* genSubgraph(const unsigned int vertices, const unsigned int edges,
   return edge_list;
 }
 
-void printEdges(const struct edge* edge_list, const unsigned int edges)
+void printEdges(const struct edge *edge_list, const unsigned int edges)
 {
   for(int i = 0; i < edges; i++)
     cout<<"The "<<i<<"th edge is:" <<"("<<(edge_list + i)->src
     <<","<<(edge_list + i)->des<<","<<(edge_list + i)->prod<<")\n";
 }
 
-G1* gsArrayGen(unsigned int edges1, Pairing* e, G1* g1, Zr* s)
+G1* gsArrayGen(const unsigned int edges1, Pairing *e, G1 *g1, Zr *s)
 {
   //Elements have been passed by reference since g1 and e have private elements which cannot be copied
   G1* gsarr;
-  gsarr = new G1[edges1];
+  gsarr = new G1[edges1+1];
 
   Zr temp_s(*e,(long int)1);
 
-  for(int i = 0; i < edges1; i++)
+  for(int i = 0; i < edges1 + 1; i++)
   {
     *(gsarr+i) =  (*g1)^temp_s;
     temp_s = temp_s*(*s);
@@ -141,14 +143,14 @@ G1* gsArrayGen(unsigned int edges1, Pairing* e, G1* g1, Zr* s)
   return gsarr;
 }
 
-G2* gsArrayGen(unsigned int edges2, Pairing* e, G2* g2, Zr* s)
+G2* gsArrayGen(const unsigned int edges2, Pairing *e, G2 *g2, Zr *s)
 {
   G2* gsarr;
-  gsarr = new G2[edges2];
+  gsarr = new G2[edges2+1];
 
   Zr temp_s(*e,(long int)1);
 
-  for(int i = 0; i < edges2; i++)
+  for(int i = 0; i < edges2 + 1; i++)
   {
     *(gsarr+i) =  (*g2)^temp_s;
     temp_s = temp_s*(*s);
@@ -157,20 +159,24 @@ G2* gsArrayGen(unsigned int edges2, Pairing* e, G2* g2, Zr* s)
   return gsarr;
 }
 
-void postfix(mpz_class* a, unsigned int n)
+void postfix(mpz_class *a, unsigned int n)
 {
   for(unsigned int i = n - 1; i > 0; i--)
     *(a + i - 1) = *(a + i - 1) + *(a + i);
 }
 
-void update(mpz_class* a, const struct edge* b, unsigned int n)
+void update(mpz_class *a, const struct edge *b, unsigned int n)
 {
   for(unsigned int i = 1; i < n; i++)
     *(a + i - 1) = (b + i - 1)->prod * *(a + i);
 }
 
-mpz_class* polyCoeff(const struct edge* edge_list, const unsigned int edges)
+Zr* polyCoeff(const struct edge* edge_list, const unsigned int edges,
+Pairing *e)
 {
+  //Returns an array of polynomial coeffiecents when the input is the constant
+  //terms as in the acc product(a,b,c,..) where (x+a)(x+b)(x+c)... is the
+  //polynomial.
   mpz_class sum = 0;
   mpz_class *pcoeff_arr = new mpz_class[edges+1];
   mpz_class *temp_prod = new mpz_class[edges];
@@ -198,13 +204,45 @@ mpz_class* polyCoeff(const struct edge* edge_list, const unsigned int edges)
   	update(temp_prod, edge_list, edges);
   }
 
-  return pcoeff_arr;
+  //Conversion to Zr
+  Zr* pcoeff_arrZr = new Zr[edges+1];
+
+  for(unsigned int i = 0; i < edges + 1; i++)
+  {
+    //Initialising Zr with mpz_t
+    Zr temp_Zr(*e,(pcoeff_arr+i)->get_mpz_t());
+    *(pcoeff_arrZr + i) = temp_Zr;
+  }
+
+  return pcoeff_arrZr;
+}
+
+G1 accumulate(const unsigned int edges1, Zr *pcoeff_E1, G1 *gs1, Pairing *e)
+{
+  G1 accE_1(*e,true);
+  for(int i = 0; i < edges1 + 1; i++)
+  {
+    accE_1 = accE_1 * (gs1[i]^pcoeff_E1[edges1 - i]);
+  }
+
+  return accE_1;
+}
+
+G2 accumulate(const unsigned int edges2, Zr *pcoeff_E2, G2 *gs2, Pairing *e)
+{
+  G2 accE_2(*e,true);
+  for(int i = 0; i < edges2 + 1; i++)
+  {
+    accE_2 = accE_2 * (gs2[i]^pcoeff_E2[edges2 - i]);
+  }
+
+  return accE_2;
 }
 
 int main(void)
 {
-
-  const unsigned int vertices1 = 5, vertices2 = 5, edges1 = 5, edges2 = 5;//Prover
+  unsigned int topo = 1000;
+  const unsigned int vertices1 = topo, vertices2 = topo, edges1 = topo, edges2 = topo;//Prover
   const unsigned int vertices = vertices1 + vertices2, edges = edges1 + edges2;//Prover
   const mpz_class *prime_arr = getPrimes(vertices);//Prover
 
@@ -276,12 +314,17 @@ int main(void)
   would require multiple levels of bilinear pairings.
 */
 
-  mpz_class *pcoeff_E1;
-  mpz_class *pcoeff_E2;
+  Zr *pcoeff_E1;
+  Zr *pcoeff_E2;
 
-  pcoeff_E1 = polyCoeff(E_1,edges1);
-  pcoeff_E2 = polyCoeff(E_2,edges2);
+  pcoeff_E1 = polyCoeff(E_1,edges1,&e);
+  pcoeff_E2 = polyCoeff(E_2,edges2,&e);
 
+  G1 accE_1(e,true);
+  G2 accE_2(e,true);
+
+  accE_1 = accumulate(edges1, pcoeff_E1, gs1, &e);
+  accE_2 = accumulate(edges2, pcoeff_E2, gs2, &e);
 
 }
 
@@ -295,6 +338,12 @@ for(unsigned int i = 0; i < edges2 + 1; i++)
 
 for(unsigned int i = 0; i < vertices; i++)
   cout<<"Prime "<<i<<" :"<<*(prime_arr + i)<<"\n";
+
+for(int i = 0; i < edges1; i++)
+{
+  cout<<"E1 - Coeff of s^("<<edges1-i<<") ";
+  (pcoeff_E1+i)->dump(stdout,"",10);
+}
 
 for(int i = 0; i < edges; i++)
 {
