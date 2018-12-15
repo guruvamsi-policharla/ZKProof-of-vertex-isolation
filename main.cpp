@@ -6,7 +6,6 @@
 using namespace std;
 
 //Function Prototypes
-
 //Global variables
 
 struct edge{
@@ -23,6 +22,7 @@ struct edge{
 
 mpz_class* getPrimes(int n)
 {
+  //Returns an array of first n primes
   mpz_class *prime_arr = new mpz_class[n];
 
   if(n >= 1)
@@ -58,7 +58,7 @@ mpz_class* getPrimes(int n)
 
 bool edgeCompare(struct edge edge_1,struct edge edge_2)
 {
-  //returns true if the two edges being compared are the same
+  //Returns true if the edges sent are the same
   if(edge_1.src == edge_2.src && edge_1.des == edge_2.des)
     return true;
   else
@@ -82,7 +82,7 @@ struct edge* genSubgraph(const unsigned int vertices, const unsigned int edges,
   const mpz_class *prime_arr, unsigned int vShift)
 {
   //Generates random edges with given number of vertices and edges
-  //Initialising prng
+
   time_t t;
   srand((unsigned) time(&t));
 
@@ -121,6 +121,7 @@ struct edge* genSubgraph(const unsigned int vertices, const unsigned int edges,
 
 void printEdges(const struct edge *edge_list, const unsigned int edges)
 {
+  //Prints edges from the given edge list
   for(int i = 0; i < edges; i++)
     cout<<"The "<<i<<"th edge is:" <<"("<<(edge_list + i)->src
     <<","<<(edge_list + i)->des<<","<<(edge_list + i)->prod<<")\n";
@@ -128,9 +129,10 @@ void printEdges(const struct edge *edge_list, const unsigned int edges)
 
 G1* gsArrayGen(const unsigned int edges1, Pairing *e, G1 *g1, Zr *s)
 {
-  //Elements have been passed by reference since g1 and e have private elements which cannot be copied
+  //Elements have been passed by reference since g1 and e have private elements
+  //which cannot be copied
   G1* gsarr;
-  gsarr = new G1[edges1+1];
+  gsarr = new G1[edges1 + 1];
 
   Zr temp_s(*e,(long int)1);
 
@@ -146,7 +148,7 @@ G1* gsArrayGen(const unsigned int edges1, Pairing *e, G1 *g1, Zr *s)
 G2* gsArrayGen(const unsigned int edges2, Pairing *e, G2 *g2, Zr *s)
 {
   G2* gsarr;
-  gsarr = new G2[edges2+1];
+  gsarr = new G2[edges2 + 1];
 
   Zr temp_s(*e,(long int)1);
 
@@ -161,12 +163,14 @@ G2* gsArrayGen(const unsigned int edges2, Pairing *e, G2 *g2, Zr *s)
 
 void postfix(mpz_class *a, unsigned int n)
 {
+  //Used for interpolation by polyCoeff
   for(unsigned int i = n - 1; i > 0; i--)
     *(a + i - 1) = *(a + i - 1) + *(a + i);
 }
 
 void update(mpz_class *a, const struct edge *b, unsigned int n)
 {
+  //Used for interpolation by polyCoeffs
   for(unsigned int i = 1; i < n; i++)
     *(a + i - 1) = (b + i - 1)->prod * *(a + i);
 }
@@ -219,6 +223,7 @@ Pairing *e)
 
 G1 accumulate(const unsigned int edges1, Zr *pcoeff_E1, G1 *gs1, Pairing *e)
 {
+  //Creates the accumulator when given an edge set and generator in g1
   G1 accE_1(*e,true);
   for(int i = 0; i < edges1 + 1; i++)
   {
@@ -230,6 +235,7 @@ G1 accumulate(const unsigned int edges1, Zr *pcoeff_E1, G1 *gs1, Pairing *e)
 
 G2 accumulate(const unsigned int edges2, Zr *pcoeff_E2, G2 *gs2, Pairing *e)
 {
+  //Creates the accumulator when given an edge set and generator in g2
   G2 accE_2(*e,true);
   for(int i = 0; i < edges2 + 1; i++)
   {
@@ -241,7 +247,7 @@ G2 accumulate(const unsigned int edges2, Zr *pcoeff_E2, G2 *gs2, Pairing *e)
 
 int main(void)
 {
-  unsigned int topo = 1000;
+  unsigned int topo = 5;
   const unsigned int vertices1 = topo, vertices2 = topo, edges1 = topo, edges2 = topo;//Prover
   const unsigned int vertices = vertices1 + vertices2, edges = edges1 + edges2;//Prover
   const mpz_class *prime_arr = getPrimes(vertices);//Prover
@@ -250,25 +256,37 @@ int main(void)
   const struct edge *E_1 = genSubgraph(vertices1,edges1,prime_arr,0);//Prover
   const struct edge *E_2 = genSubgraph(vertices2,edges2,prime_arr,vertices1);//Prover
 
-  for(unsigned int i = 0; i < vertices; i++)
-    cout<<"Prime "<<i<<" :"<<*(prime_arr + i)<<"\n";
+  //for(unsigned int i = 0; i < vertices; i++)
+    //cout<<"Prime "<<i<<" :"<<*(prime_arr + i)<<"\n";
 
-  printEdges(E_1,edges1);
-  printEdges(E_2,edges2);
+  //printEdges(E_1,edges1);
+  //printEdges(E_2,edges2);
+
   //Setting pairing parameters
-  const char *paramFileName = "a.param";
-  FILE *sysParamFile = fopen(paramFileName, "r");
+  pbc_param_t par;
+  pbc_param_init_a_gen(par, 1024, 2048);
+
+  //Since there is no C++ parameter file generator, I am currently
+  //writing the parameters to a file "my a.param" first and then
+  //reading from the same using the C++ parameter init function
+  const char *paramFileName = "my a.param";
+  FILE *sysParamFile = fopen(paramFileName, "w");
+  pbc_param_out_str(sysParamFile, par);
+  fclose(sysParamFile);
+  sysParamFile = fopen(paramFileName, "r");
   if (sysParamFile == NULL) {
     cerr<<"Can't open the parameter file " << paramFileName << "\n";
     return 0;
   }
 
   Pairing e(sysParamFile);
+
   //cout<<"Pairing Confirmation: "<< e.isPairingPresent()<< endl;
   //cout<<"Symmetric Pairing: "<< e.isSymmetric()<< endl;
+
+  cout<<e.get_pbc_param_t();
   fclose(sysParamFile);
 
-  //Intialising generators to identity
   G1 g1(e,true);
   G2 g2(e,true);
 
@@ -317,15 +335,16 @@ int main(void)
   Zr *pcoeff_E1;
   Zr *pcoeff_E2;
 
-  pcoeff_E1 = polyCoeff(E_1,edges1,&e);
-  pcoeff_E2 = polyCoeff(E_2,edges2,&e);
+  pcoeff_E1 = polyCoeff(E_1,edges1,&e);//Prover
+  pcoeff_E2 = polyCoeff(E_2,edges2,&e);//Prover
 
   G1 accE_1(e,true);
   G2 accE_2(e,true);
 
-  accE_1 = accumulate(edges1, pcoeff_E1, gs1, &e);
-  accE_2 = accumulate(edges2, pcoeff_E2, gs2, &e);
+  accE_1 = accumulate(edges1, pcoeff_E1, gs1, &e);//Prover
+  accE_2 = accumulate(edges2, pcoeff_E2, gs2, &e);//Prover
 
+  
 }
 
 /*
