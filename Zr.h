@@ -19,7 +19,7 @@ public:
   //Create an element from long int  
   Zr(const Pairing &e, long int i);
 
-  //Create an element from long int  
+  //Create an element from mpz_t  
   Zr(const Pairing &e, mpz_t i);
 
   //Create an element from import 

@@ -247,7 +247,7 @@ G2 accumulate(const unsigned int edges2, Zr *pcoeff_E2, G2 *gs2, Pairing *e)
 
 int main(void)
 {
-  unsigned int topo = 5;
+  unsigned int topo = 30;
   const unsigned int vertices1 = topo, vertices2 = topo, edges1 = topo, edges2 = topo;//Prover
   const unsigned int vertices = vertices1 + vertices2, edges = edges1 + edges2;//Prover
   const mpz_class *prime_arr = getPrimes(vertices);//Prover
@@ -256,6 +256,19 @@ int main(void)
   const struct edge *E_1 = genSubgraph(vertices1,edges1,prime_arr,0);//Prover
   const struct edge *E_2 = genSubgraph(vertices2,edges2,prime_arr,vertices1);//Prover
 
+  mpz_class edge_prod = 1;
+  for(unsigned int i = 0; i < edges1; i++)
+  {
+    edge_prod = edge_prod * E_1[i].prod;
+  }
+  for(unsigned int i = 0; i < edges2; i++)
+  {
+    edge_prod = edge_prod * E_2[i].prod;
+  }
+
+  cout<<"Size of the constant term in the polynomial is : "<<
+  mpz_sizeinbase(edge_prod.get_mpz_t(), 2)/8.0<<endl;
+  
   //for(unsigned int i = 0; i < vertices; i++)
     //cout<<"Prime "<<i<<" :"<<*(prime_arr + i)<<"\n";
 
@@ -263,29 +276,40 @@ int main(void)
   //printEdges(E_2,edges2);
 
   //Setting pairing parameters
-  pbc_param_t par;
-  pbc_param_init_a_gen(par, 1024, 2048);
-
   //Since there is no C++ parameter file generator, I am currently
   //writing the parameters to a file "my a.param" first and then
   //reading from the same using the C++ parameter init function
+  pbc_param_t par;
+  pbc_param_init_a_gen(par, 1024, 2048);
+
+
+  pairing_t e_temp;
+  pairing_init_pbc_param(e_temp, par);
+  cout<<pairing_length_in_bytes_Zr(e_temp)<<endl;
+
+
+  if(pairing_length_in_bytes_Zr(e_temp)<mpz_sizeinbase(edge_prod.get_mpz_t(), 2)/8.0)
+  {
+    cerr<<"Size of Zr is too small. Increase size of r or decrease number of edges/vertices."
+    <<endl;
+    return 0;
+  }
+
   const char *paramFileName = "my a.param";
   FILE *sysParamFile = fopen(paramFileName, "w");
   pbc_param_out_str(sysParamFile, par);
   fclose(sysParamFile);
+
   sysParamFile = fopen(paramFileName, "r");
   if (sysParamFile == NULL) {
     cerr<<"Can't open the parameter file " << paramFileName << "\n";
     return 0;
   }
-
   Pairing e(sysParamFile);
-
+  //cout<<e.get_pbc_param_t();
+  fclose(sysParamFile);
   //cout<<"Pairing Confirmation: "<< e.isPairingPresent()<< endl;
   //cout<<"Symmetric Pairing: "<< e.isSymmetric()<< endl;
-
-  cout<<e.get_pbc_param_t();
-  fclose(sysParamFile);
 
   G1 g1(e,true);
   G2 g2(e,true);
@@ -338,13 +362,26 @@ int main(void)
   pcoeff_E1 = polyCoeff(E_1,edges1,&e);//Prover
   pcoeff_E2 = polyCoeff(E_2,edges2,&e);//Prover
 
+  for(int i = 0; i < edges1; i++)
+  {
+    cout<<"E1 - Coeff of s^("<<edges1-i<<") ";
+    (pcoeff_E1+i)->dump(stdout,"",10);
+  }
+
+  for(int i = 0; i < edges2; i++)
+  {
+    cout<<"E2 - Coeff of s^("<<edges2-i<<") ";
+    (pcoeff_E2+i)->dump(stdout,"",10);
+  }
+
+
   G1 accE_1(e,true);
   G2 accE_2(e,true);
 
   accE_1 = accumulate(edges1, pcoeff_E1, gs1, &e);//Prover
   accE_2 = accumulate(edges2, pcoeff_E2, gs2, &e);//Prover
 
-  
+
 }
 
 /*
