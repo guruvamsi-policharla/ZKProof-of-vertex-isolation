@@ -119,6 +119,22 @@ struct edge* genSubgraph(const unsigned int vertices, const unsigned int edges,
   return edge_list;
 }
 
+struct edge* joinGraphs(const unsigned int edges1, const unsigned int edges2,
+  const struct edge* E_1, const struct edge* E_2)
+{
+  unsigned int edges = edges1 + edges2;
+  struct edge new_edge;
+  struct edge* edge_list;
+  edge_list = new edge[edges];
+
+  for(unsigned int i = 0; i < edges1; i++)
+    edge_list[i] = E_1[i];
+  for(unsigned int i = 0; i < edges2; i++)
+    edge_list[i + edges1] = E_2[i];
+
+  return edge_list;
+}
+
 void printEdges(const struct edge *edge_list, const unsigned int edges)
 {
   //Prints edges from the given edge list
@@ -247,46 +263,45 @@ G2 accumulate(const unsigned int edges2, Zr *pcoeff_E2, G2 *gs2, Pairing *e)
 
 int main(void)
 {
-  unsigned int topo = 30;
+  unsigned int topo = 5;
   const unsigned int vertices1 = topo, vertices2 = topo, edges1 = topo, edges2 = topo;//Prover
   const unsigned int vertices = vertices1 + vertices2, edges = edges1 + edges2;//Prover
   const mpz_class *prime_arr = getPrimes(vertices);//Prover
 
   //Generating to disjoint Subgraphs
-  const struct edge *E_1 = genSubgraph(vertices1,edges1,prime_arr,0);//Prover
-  const struct edge *E_2 = genSubgraph(vertices2,edges2,prime_arr,vertices1);//Prover
+  const struct edge *E_1 = genSubgraph(vertices1, edges1, prime_arr, 0);//Prover
+  const struct edge *E_2 = genSubgraph(vertices2, edges2, prime_arr, vertices1);//Prover
+  const struct edge *E = joinGraphs(edges1, edges2, E_1, E_2);
 
   mpz_class edge_prod = 1;
+
   for(unsigned int i = 0; i < edges1; i++)
-  {
     edge_prod = edge_prod * E_1[i].prod;
-  }
+
   for(unsigned int i = 0; i < edges2; i++)
-  {
     edge_prod = edge_prod * E_2[i].prod;
-  }
+
 
   cout<<"Size of the constant term in the polynomial is : "<<
   mpz_sizeinbase(edge_prod.get_mpz_t(), 2)/8.0<<endl;
-  
+
   //for(unsigned int i = 0; i < vertices; i++)
     //cout<<"Prime "<<i<<" :"<<*(prime_arr + i)<<"\n";
 
-  //printEdges(E_1,edges1);
-  //printEdges(E_2,edges2);
-
+  printEdges(E_1,edges1);
+  printEdges(E_2,edges2);
+  printEdges(E,edges);
   //Setting pairing parameters
   //Since there is no C++ parameter file generator, I am currently
   //writing the parameters to a file "my a.param" first and then
   //reading from the same using the C++ parameter init function
   pbc_param_t par;
-  pbc_param_init_a_gen(par, 1024, 2048);
+  pbc_param_init_a_gen(par, 160, 512);
 
 
   pairing_t e_temp;
   pairing_init_pbc_param(e_temp, par);
-  cout<<pairing_length_in_bytes_Zr(e_temp)<<endl;
-
+  cout<<"Size of Zr : "<<pairing_length_in_bytes_Zr(e_temp)<<endl;
 
   if(pairing_length_in_bytes_Zr(e_temp)<mpz_sizeinbase(edge_prod.get_mpz_t(), 2)/8.0)
   {
@@ -313,7 +328,6 @@ int main(void)
 
   G1 g1(e,true);
   G2 g2(e,true);
-
   //Element from HASH. Nothing up my sleeve generators.
   g1 = G1(e, "Generator 1", 11);//All
   //g1.dump(stdout,"Generator 1 - g1 is");
@@ -329,6 +343,7 @@ int main(void)
   //Public information array needed for making accumulators. This array would
   //be given to the prover and verifier by the trusted auditor.
   G1* gs1;
+  G1* gs;
   G2* gs2;
 
   Zr s(e,true); //Auditor. Random s chosen by the auditor. This cannot be
@@ -336,6 +351,7 @@ int main(void)
 
   gs1 = gsArrayGen(edges1, &e, &g1, &s);//Auditor
   gs2 = gsArrayGen(edges2, &e, &g2, &s);//Auditor
+  gs = gsArrayGen(edges, &e, &g1, &s);//Auditor
 
 /*
   Polynomial Interpolation: We want the exponent to stay in Zr
@@ -358,28 +374,21 @@ int main(void)
 
   Zr *pcoeff_E1;
   Zr *pcoeff_E2;
+  Zr *pcoeff_E;
 
-  pcoeff_E1 = polyCoeff(E_1,edges1,&e);//Prover
-  pcoeff_E2 = polyCoeff(E_2,edges2,&e);//Prover
-
-  for(int i = 0; i < edges1; i++)
-  {
-    cout<<"E1 - Coeff of s^("<<edges1-i<<") ";
-    (pcoeff_E1+i)->dump(stdout,"",10);
-  }
-
-  for(int i = 0; i < edges2; i++)
-  {
-    cout<<"E2 - Coeff of s^("<<edges2-i<<") ";
-    (pcoeff_E2+i)->dump(stdout,"",10);
-  }
+  pcoeff_E1 = polyCoeff(E_1, edges1, &e);//Prover
+  pcoeff_E2 = polyCoeff(E_2, edges2, &e);//Prover
+  pcoeff_E = polyCoeff(E, edges, &e);//Prover
 
 
   G1 accE_1(e,true);
+  G1 accE(e,true);
   G2 accE_2(e,true);
 
   accE_1 = accumulate(edges1, pcoeff_E1, gs1, &e);//Prover
   accE_2 = accumulate(edges2, pcoeff_E2, gs2, &e);//Prover
+  accE = accumulate(edges, pcoeff_E, gs, &e);
+  //Commitments
 
 
 }
