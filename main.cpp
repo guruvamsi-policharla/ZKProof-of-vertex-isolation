@@ -288,9 +288,9 @@ int main(void)
   //for(unsigned int i = 0; i < vertices; i++)
     //cout<<"Prime "<<i<<" :"<<*(prime_arr + i)<<"\n";
 
-  printEdges(E_1,edges1);
-  printEdges(E_2,edges2);
-  printEdges(E,edges);
+  //printEdges(E_1,edges1);
+  //printEdges(E_2,edges2);
+  //printEdges(E,edges);
   //Setting pairing parameters
   //Since there is no C++ parameter file generator, I am currently
   //writing the parameters to a file "my a.param" first and then
@@ -342,16 +342,16 @@ int main(void)
 
   //Public information array needed for making accumulators. This array would
   //be given to the prover and verifier by the trusted auditor.
-  G1* gs1;
   G1* gs;
+  G1* gs1;
   G2* gs2;
 
   Zr s(e,true); //Auditor. Random s chosen by the auditor. This cannot be
   //revealed to the verifier or the prover.
 
+  gs = gsArrayGen(edges, &e, &g1, &s);//Auditor
   gs1 = gsArrayGen(edges1, &e, &g1, &s);//Auditor
   gs2 = gsArrayGen(edges2, &e, &g2, &s);//Auditor
-  gs = gsArrayGen(edges, &e, &g1, &s);//Auditor
 
 /*
   Polynomial Interpolation: We want the exponent to stay in Zr
@@ -372,23 +372,48 @@ int main(void)
   would require multiple levels of bilinear pairings.
 */
 
+  Zr *pcoeff_E;
   Zr *pcoeff_E1;
   Zr *pcoeff_E2;
-  Zr *pcoeff_E;
 
+  pcoeff_E = polyCoeff(E, edges, &e);//Prover
   pcoeff_E1 = polyCoeff(E_1, edges1, &e);//Prover
   pcoeff_E2 = polyCoeff(E_2, edges2, &e);//Prover
-  pcoeff_E = polyCoeff(E, edges, &e);//Prover
 
-
-  G1 accE_1(e,true);
   G1 accE(e,true);
+  G1 accE_1(e,true);
   G2 accE_2(e,true);
 
+  accE = accumulate(edges, pcoeff_E, gs, &e);//Prover,Auditor
   accE_1 = accumulate(edges1, pcoeff_E1, gs1, &e);//Prover
   accE_2 = accumulate(edges2, pcoeff_E2, gs2, &e);//Prover
-  accE = accumulate(edges, pcoeff_E, gs, &e);
+
+  //Commitments setup
+  G1 S1(e,true);
+  G2 S2(e,true);
+
+  S1 = G1(e, "Blinding factor 1", 17);//All
+  S2 = G2(e, "Blinding factor 2", 17);//All
+
   //Commitments
+  Zr r_E(e,true);
+  Zr r_E_1(e,true);
+  Zr r_E_2(e,true);
+  Zr r_rho_1(e,true);
+  Zr r_rho_2(e,true);
+
+  G1 C_E(e,true);
+  G1 C_E_1(e,true);
+  G1 C_rho_1(e,true);
+  G2 C_E_2(e,true);
+  G2 C_rho_2(e,true);
+
+  C_E = accE * S1^r_E;//Prover
+  C_E_1 = accE_1 * S1^r_E_1;//Prover
+  C_rho_1 = (g1^pcoeff_E1[edges1]) * (S1^r_rho_1);
+  //There seems to be an issue in deciding precedence without brackets
+  C_rho_2 = (g2^pcoeff_E2[edges2]) * (S2^r_rho_2);
+  C_E_2 = accE_2 * S2^r_E_2;//Prover
 
 
 }
