@@ -163,7 +163,7 @@ G1* gsArrayGen(const unsigned int edges1, Pairing *e, G1 *g1, Zr *s)
   for(int i = 0; i < edges1 + 1; i++)
   {
     *(gsarr+i) =  (*g1)^temp_s;
-    temp_s = temp_s*(*s);
+    temp_s *= (*s);
   }
 
   return gsarr;
@@ -251,7 +251,7 @@ G1 accumulate(const unsigned int edges1, Zr *pcoeff_E1, G1 *gs1, Pairing *e)
   G1 accE_1(*e,true);
   for(int i = 0; i < edges1 + 1; i++)
   {
-    accE_1 = accE_1 * (gs1[i]^pcoeff_E1[edges1 - i]);
+    accE_1 *= (gs1[i]^pcoeff_E1[edges1 - i]);
   }
 
   return accE_1;
@@ -263,9 +263,8 @@ G2 accumulate(const unsigned int edges2, Zr *pcoeff_E2, G2 *gs2, Pairing *e)
   G2 accE_2(*e,true);
   for(int i = 0; i < edges2 + 1; i++)
   {
-    accE_2 = accE_2 * (gs2[i]^pcoeff_E2[edges2 - i]);
+    accE_2 *= (gs2[i]^pcoeff_E2[edges2 - i]);
   }
-
   return accE_2;
 }
 
@@ -619,7 +618,7 @@ int main(void)
 
   Zr s(e,true); //Auditor. Random s chosen by the auditor. This cannot be
   //revealed to the verifier or the prover.
-
+  //Zr s(e,(long int)2);
   gs = gsArrayGen(edges, &e, &g1, &s);//Auditor
   gs1 = gsArrayGen(edges1, &e, &g1, &s);//Auditor
   gs2 = gsArrayGen(edges2, &e, &g2, &s);//Auditor
@@ -679,25 +678,27 @@ int main(void)
   G2 C_E_2(e,true);
   G2 C_rho_2(e,true);
 
-  C_E = accE * S1^r_E;//Prover
-  C_E_1 = accE_1 * S1^r_E_1;//Prover
+  C_E = accE * (S1^r_E);//Prover
+  C_E_1 = accE_1 * (S1^r_E_1);//Prover
   C_rho_1 = (g1^pcoeff_E1[edges1]) * (S1^r_rho_1);
   //There seems to be an issue in deciding precedence without brackets
   C_rho_2 = (g2^pcoeff_E2[edges2]) * (S2^r_rho_2);
-  C_E_2 = accE_2 * S2^r_E_2;//Prover
+  C_E_2 = accE_2 * (S2^r_E_2);//Prover
+
 
   ////////////////////////////////////////////////////////////////Setup Complete
 
   /////////////////////////////////////////////////////////////////////SPK1 test
+{
   Zr x(e,true);
-  G1 y(e,false);
+  G1 y(e,true);
   y = (g1^x);
   char m[1000];
   strcpy(m,"Test String");
   struct zkproof *p1 = SPK1(&x, &y, m, &g1, &e);
   //----------------------------------------------------------------------------
-  G1 V(e,false);
-  Zr c(e,true);
+  G1 V(e,true);
+  Zr c(e,false);
 
   char temp_string[1000]; //TODO: Automate this length
   char hash_inp[10000];
@@ -731,12 +732,19 @@ int main(void)
   else
     cout<<"SPK1 Verification Failed"<<endl;
 
-
+}
   ////////////////////////////////////////////////////SPK1 verification complete
 
   /////////////////////////////////////////////////////////////////////SPK2 test
+{
   Zr *x_arr = new Zr[edges1 + 1];
-  y = G1(e,true);
+  G1 y(e,true);
+  char m[1000];
+  strcpy(m,"Test String");
+
+  char temp_string[1000]; //TODO: Automate this length
+  char hash_inp[10000];
+  strcpy(hash_inp,"");
 
   for(unsigned int i = 0; i < edges1 + 1; i++)
   {
@@ -757,7 +765,7 @@ int main(void)
   element_snprintf(temp_string, 1000, "%B", y);
   strcat(hash_inp,temp_string);
 
-  V = G1(e,true);
+  G1 V(e,true);
   V = (y^p2->c[0]);
   for(unsigned int i = 0; i < edges1 + 1; i++)
   {
@@ -769,26 +777,29 @@ int main(void)
 
   strcat(hash_inp,m);
 
-  hash_inp_str = string(hash_inp);
+  string hash_inp_str = string(hash_inp);
+  char sha_outp[64];
   strcpy(sha_outp,picosha2::hash256_hex_string(hash_inp_str).c_str());
 
+  Zr c(e,false);
   c = Zr(e,sha_outp,strlen(sha_outp));
 
   if(c == p2->c[0])
     cout<<"SPK2 Verified"<<endl;
   else
     cout<<"SPK2 Verification Failed"<<endl;
-
+}
   ////////////////////////////////////////////////////SPK2 verification complete
 
   /////////////////////////////////////////////////////////////////////SPK7 test
-  delete[] x_arr;
+{
 
-  x_arr = new Zr[edges1 + 1 + 3];//2 S1s extra and one g1
+  Zr *x_arr = new Zr[edges1 + 1 + 3];//2 S1s extra and one g1
   G1 *y_arr = new G1[2];
-  y = G1(e,true);
-
   G1 *g1_basis = new G1[edges1 + 1 + 1];//S1 extra added
+
+  char m[1000];
+  strcpy(m,"Test String");
 
   unsigned int g1_count = edges1 + 2;
   unsigned int y_count = 2;
@@ -808,25 +819,26 @@ int main(void)
     x_arr[edges1 + 2] = x_arr[0];
     x_arr[edges1 + 3] = Zr(e,true);
 
+  y_arr[0] = G1(e,true);
   for(unsigned int i = 0; i < edges1 + 2; i++)
   {
-    y *= g1_basis[i]^x_arr[i];
+    y_arr[0] *= g1_basis[i]^x_arr[i];
   }
-  y_arr[0] = y;
 
-  y = G1(e,true);
+  y_arr[1] = G1(e,true);
+    y_arr[1] *= g1_basis[0]^x_arr[0];
+    y_arr[1] *= g1_basis[g1_count - 1]^x_arr[edges1 + 3];
 
-    y *= g1_basis[0]^x_arr[0];
-    y *= g1_basis[g1_count - 1]^x_arr[edges1 + 3];
 
-  y_arr[1] = y;
-
-  strcpy(hash_inp,"");
   strcpy(m,"Test String");
   struct zkproof *p7 = SPK7(x_arr, y_arr, 2, m, g1_basis, edges1 + 2,
      edges1 + 4, edges1 + 3, &e);
 
   ////////////////////////Verification
+  char temp_string[1000]; //TODO: Automate this length
+  char hash_inp[10000];
+  strcpy(hash_inp,"");
+
   for(unsigned int i = 0; i < g1_count; i++)
   {
     element_snprintf(temp_string, 1000, "%B", g1_basis + i);
@@ -872,7 +884,7 @@ int main(void)
     element_snprintf(temp_string, 1000, "%d|", g1_count-1);
     strcat(hash_inp,temp_string);
 
-  V = G1(e,true);
+  G1 V(e,true);
 
   V *= y_arr[0]^p7->c[0];
   for(unsigned int i = 0; i < p7->s_count-1; i++)
@@ -895,18 +907,139 @@ int main(void)
 
   strcat(hash_inp,m);
 
-  hash_inp_str = string(hash_inp);
+  string hash_inp_str = string(hash_inp);
+  char sha_outp[64];
   strcpy(sha_outp,picosha2::hash256_hex_string(hash_inp_str).c_str());
 
+  Zr c(e,false);
   c = Zr(e,sha_outp,strlen(sha_outp));
 
   if(c == p7->c[0])
     cout<<"SPK7 Verified"<<endl;
   else
     cout<<"SPK7 Verification Failed"<<endl;
+}
   ////////////////////////////////////////////////////SPK7 verification complete
 
-  
+  /////////////////////////////////////////////////////SPK7 test using polyCoeff
+{
+  Zr *x_arr = new Zr[edges1 + 1 + 3];//2 S1s extra and one g1
+  G1 *y_arr = new G1[2];
+  G1 *g1_basis = new G1[edges1 + 1 + 1];//S1 extra added
+
+  char m[1000];
+  strcpy(m,"Test String");
+
+  unsigned int g1_count = edges1 + 2;
+  unsigned int y_count = 2;
+
+  for(unsigned int i = 0; i < edges1 + 1; i++)
+  {
+    g1_basis[i] = gs1[i];
+  }
+  g1_basis[edges1+1] = S1;
+
+  for(unsigned int i = 0; i < edges1 + 1; i++)
+  {
+    x_arr[i] = pcoeff_E1[edges1 - i];
+  }
+    x_arr[edges1 + 1] = r_E_1;
+    x_arr[edges1 + 2] = x_arr[0];
+    x_arr[edges1 + 3] = r_rho_1;
+
+  y_arr[0] = C_E_1;
+  y_arr[1] = C_rho_1;
+
+  strcpy(m,"Test String");
+  struct zkproof *p7 = SPK7(x_arr, y_arr, 2, m, g1_basis, edges1 + 2,
+     edges1 + 4, edges1 + 3, &e);
+
+  ////////////////////////Verification
+  char temp_string[1000]; //TODO: Automate this length
+  char hash_inp[10000];
+  strcpy(hash_inp,"");
+
+  for(unsigned int i = 0; i < g1_count; i++)
+  {
+    element_snprintf(temp_string, 1000, "%B", g1_basis + i);
+    strcat(hash_inp,temp_string);
+  }
+
+  //y_arr feed
+  for(unsigned int i = 0; i < y_count; i++)
+  {
+    element_snprintf(temp_string, 1000, "%B", y_arr + i);
+    strcat(hash_inp,temp_string);
+  }
+
+  //J feed
+  for(unsigned int i = 0; i < g1_count-1; i++)
+  {
+    element_snprintf(temp_string, 1000, "%d,", i);
+    strcat(hash_inp,temp_string);
+  }
+  //Concatenating S_1
+    element_snprintf(temp_string, 1000, "%d|", g1_count-1);
+    strcat(hash_inp,temp_string);
+  //Concatenating g1
+    element_snprintf(temp_string, 1000, "%d,", 0);
+    strcat(hash_inp,temp_string);
+  //Concatenating S_1
+    element_snprintf(temp_string, 1000, "%d|", g1_count-1);
+    strcat(hash_inp,temp_string);
+
+  //e feed
+  for(unsigned int i = 0; i < g1_count-1; i++)
+  {
+    element_snprintf(temp_string, 1000, "%d,", i);
+    strcat(hash_inp,temp_string);
+  }
+  //Concatenating S_1
+    element_snprintf(temp_string, 1000, "%d|", g1_count-1);
+    strcat(hash_inp,temp_string);
+  //Concatenating g1
+    element_snprintf(temp_string, 1000, "%d,", 0);
+    strcat(hash_inp,temp_string);
+  //Concatenating S_1
+    element_snprintf(temp_string, 1000, "%d|", g1_count-1);
+    strcat(hash_inp,temp_string);
+
+  G1 V(e,true);
+
+  V *= y_arr[0]^p7->c[0];
+  for(unsigned int i = 0; i < p7->s_count-1; i++)
+  {
+    V *= (g1_basis[i])^p7->s[i];
+  }
+
+  element_snprintf(temp_string, 1000, "%B", V);
+  strcat(hash_inp,temp_string);
+
+  V = G1(e,true);
+
+  V = y_arr[1]^p7->c[0];
+
+    V *= (g1_basis[0])^p7->s[0];
+    V *= (g1_basis[g1_count-1])^p7->s[p7->s_count-1];
+
+  element_snprintf(temp_string, 1000, "%B", V);
+  strcat(hash_inp,temp_string);
+
+  strcat(hash_inp,m);
+
+  string hash_inp_str = string(hash_inp);
+  char sha_outp[64];
+  strcpy(sha_outp,picosha2::hash256_hex_string(hash_inp_str).c_str());
+
+  Zr c(e,false);
+  c = Zr(e,sha_outp,strlen(sha_outp));
+
+  if(c == p7->c[0])
+    cout<<"SPK7 using polyCoeff Verified"<<endl;
+  else
+    cout<<"SPK7 using polyCoeff Verification Failed"<<endl;
+}
+  ////////////////////////////////////SPK7 verification using polyCoeff complete
 }
 
 /*
