@@ -313,7 +313,224 @@ struct zkproof* SPK1(Zr *x, G1 *y, char *m, G1 *g1, Pairing *e)
 
 }
 
-//struct zkproof* SPK2(Zr *x, G1 *y, char *m, G1 *g1, Pairing *e)
+struct zkproof* SPK1(Zr *x, G2 *y, char *m, G2 *g2, Pairing *e)
+{
+  Zr r(*e,true);
+  G2 t(*e,true);
+  Zr c(*e,false);
+  Zr s(*e,false);
+
+
+  char temp_string[1000]; //TODO: Automate this length
+  char hash_inp[10000];
+  strcpy(hash_inp,"");
+
+  element_snprintf(temp_string, 1000, "%B", g2);
+  strcat(hash_inp,temp_string);
+
+  element_snprintf(temp_string, 1000, "%B", y);
+  strcat(hash_inp,temp_string);
+
+  t = (*g2)^r;
+  element_snprintf(temp_string, 1000, "%B", t);
+  strcat(hash_inp,temp_string);
+
+  strcat(hash_inp,m);//FIx this by using a SHA256 first maybe?
+  //cout<<hash_inp<<endl;
+
+  string hash_inp_str = string(hash_inp);
+  char sha_outp[64];
+  strcpy(sha_outp,picosha2::hash256_hex_string(hash_inp_str).c_str());
+
+  c = Zr(*e,sha_outp,strlen(sha_outp));
+
+  s = r - (c*(*x));
+
+  struct zkproof *p1 = new zkproof[1];
+  p1->c_count = 1;
+  p1->c = new Zr[1];
+  *(p1->c) = c;
+  p1->s = new Zr[1];
+  p1->s_count = 1;
+  *(p1->s) = s;
+  return p1;
+
+}
+
+struct zkproof* SPK2(Zr *x, G1 *y, char *m, G1 *gs1, unsigned int k, Pairing *e)
+{
+  //Zr r_temp(*e,true);
+  G1 t(*e,true);
+  Zr *s = new Zr[k];
+  Zr c(*e,false);
+  Zr *r = new Zr[k];
+  for(unsigned int i = 0; i < k; i++)
+  {
+    r[i] = Zr(*e,true);
+  }
+
+  char temp_string[1000]; //TODO: Automate this length
+  char hash_inp[10000];
+  strcpy(hash_inp,"");
+
+  for(unsigned int i = 0; i < k; i++)
+  {
+    element_snprintf(temp_string, 1000, "%B", gs1 + i);
+    strcat(hash_inp,temp_string);
+  }
+
+  element_snprintf(temp_string, 1000, "%B", y);
+  strcat(hash_inp,temp_string);
+
+  for(unsigned int i = 0; i < k; i++)
+  {
+    t *= (gs1[i])^r[i];
+  }
+
+  element_snprintf(temp_string, 1000, "%B", t);
+  strcat(hash_inp,temp_string);
+
+  strcat(hash_inp,m);
+
+  string hash_inp_str = string(hash_inp);
+  char sha_outp[64];
+  strcpy(sha_outp,picosha2::hash256_hex_string(hash_inp_str).c_str());
+
+  c = Zr(*e,sha_outp,strlen(sha_outp));
+
+  for(unsigned int i = 0; i < k; i++)
+  {
+    s[i] = r[i] - c*(x[i]);
+  }
+
+  struct zkproof *p2 = new zkproof[1];
+  p2->c_count = 1;
+  p2->c = new Zr[1];
+  p2->c[0] = c;
+  p2->s_count = k;
+  p2->s = new Zr[p2->s_count];
+
+  for(unsigned int i = 0; i < p2->s_count; i++)
+  {
+    p2->s[i] = s[i];
+  }
+
+  return p2;
+}
+
+struct zkproof* SPK7(Zr *x_arr, G1 *y_arr, unsigned int y_count, char *m,
+  G1 *g1_basis, unsigned int g1_count, unsigned int k, unsigned int u, Pairing *e)
+{
+  //g1_count is size of g1_basis
+  //u is number of different exponents i.e size of x_arr
+  G1 t1(*e,true);
+  G1 t2(*e,true);
+  Zr *s = new Zr[u];
+  Zr c(*e,false);
+  Zr *r = new Zr[u];
+  for(unsigned int i = 0; i < u; i++)
+  {
+    r[i] = Zr(*e,true);
+  }
+
+  char temp_string[1000]; //TODO: Automate this length
+  char hash_inp[10000];
+  strcpy(hash_inp,"");
+
+  //basis feed
+  for(unsigned int i = 0; i < g1_count; i++)
+  {
+    element_snprintf(temp_string, 1000, "%B", g1_basis + i);
+    strcat(hash_inp,temp_string);
+  }
+
+  //y_arr feed
+  for(unsigned int i = 0; i < y_count; i++)
+  {
+    element_snprintf(temp_string, 1000, "%B", y_arr + i);
+    strcat(hash_inp,temp_string);
+  }
+
+  //J feed
+  for(unsigned int i = 0; i < g1_count-1; i++)
+  {
+    element_snprintf(temp_string, 1000, "%d,", i);
+    strcat(hash_inp,temp_string);
+  }
+  //Concatenating S_1
+    element_snprintf(temp_string, 1000, "%d|", g1_count-1);
+    strcat(hash_inp,temp_string);
+  //Concatenating g1
+    element_snprintf(temp_string, 1000, "%d,", 0);
+    strcat(hash_inp,temp_string);
+  //Concatenating S_1
+    element_snprintf(temp_string, 1000, "%d|", g1_count-1);
+    strcat(hash_inp,temp_string);
+
+  //e feed
+  for(unsigned int i = 0; i < g1_count-1; i++)
+  {
+    element_snprintf(temp_string, 1000, "%d,", i);
+    strcat(hash_inp,temp_string);
+  }
+  //Concatenating S_1
+    element_snprintf(temp_string, 1000, "%d|", g1_count-1);
+    strcat(hash_inp,temp_string);
+  //Concatenating g1
+    element_snprintf(temp_string, 1000, "%d,", 0);
+    strcat(hash_inp,temp_string);
+  //Concatenating S_1
+    element_snprintf(temp_string, 1000, "%d|", g1_count-1);
+    strcat(hash_inp,temp_string);
+
+  //V feed
+
+  for(unsigned int i = 0; i < g1_count; i++)
+  {
+    t1 *= (g1_basis[i])^r[i];
+  }
+
+  element_snprintf(temp_string, 1000, "%B", t1);
+  strcat(hash_inp,temp_string);
+
+    t2 = (g1_basis[0])^r[0];
+    t2 *= (g1_basis[g1_count-1])^r[u-1];
+
+  element_snprintf(temp_string, 1000, "%B", t2);
+  strcat(hash_inp,temp_string);
+
+  strcat(hash_inp,m);
+
+  //cout<<hash_inp<<endl;
+
+  string hash_inp_str = string(hash_inp);
+  char sha_outp[64];
+  strcpy(sha_outp,picosha2::hash256_hex_string(hash_inp_str).c_str());
+
+  c = Zr(*e,sha_outp,strlen(sha_outp));
+
+  for(unsigned int i = 0; i < u-1; i++)
+  {
+    s[i] = r[i] - c*(x_arr[i]);
+  }
+
+    s[u-1] = r[u-1] - c*(x_arr[u]);
+
+  struct zkproof *p7 = new zkproof[1];
+  p7->c_count = 1;
+  p7->c = new Zr[1];
+  p7->c[0] = c;
+
+  p7->s_count = u;
+  p7->s = new Zr[p7->s_count];
+  for(unsigned int i = 0; i < p7->s_count; i++)
+  {
+    p7->s[i] = s[i];
+  }
+
+  return p7;
+
+}
 
 int main(void)
 {
@@ -471,6 +688,7 @@ int main(void)
 
   ////////////////////////////////////////////////////////////////Setup Complete
 
+  /////////////////////////////////////////////////////////////////////SPK1 test
   Zr x(e,true);
   G1 y(e,false);
   y = (g1^x);
@@ -478,13 +696,11 @@ int main(void)
   strcpy(m,"Test String");
   struct zkproof *p1 = SPK1(&x, &y, m, &g1, &e);
   //----------------------------------------------------------------------------
-
-
   G1 V(e,false);
   Zr c(e,true);
 
-  char temp_string[10000]; //TODO: Automate this length
-  char hash_inp[100000];
+  char temp_string[1000]; //TODO: Automate this length
+  char hash_inp[10000];
   strcpy(hash_inp,"");
 
   element_snprintf(temp_string, 10000, "%B", g1);
@@ -508,14 +724,189 @@ int main(void)
 
   //element_from_hash does not seem to be a secure cryptographic hash function
   //Hence bootstrapping with sha256 which seems to prevent false verifications
-  //with overwhelming probability.
+  //with higher probability.
 
   if(c == p1->c[0])
-    cout<<"Verified"<<endl;
+    cout<<"SPK1 Verified"<<endl;
   else
-    cout<<"Verification Failed"<<endl;
+    cout<<"SPK1 Verification Failed"<<endl;
 
 
+  ////////////////////////////////////////////////////SPK1 verification complete
+
+  /////////////////////////////////////////////////////////////////////SPK2 test
+  Zr *x_arr = new Zr[edges1 + 1];
+  y = G1(e,true);
+
+  for(unsigned int i = 0; i < edges1 + 1; i++)
+  {
+    x_arr[i] = Zr(e,true);
+    y *= gs1[i]^x_arr[i];
+  }
+
+  strcpy(hash_inp,"");
+  strcpy(m,"Test String");
+  struct zkproof *p2 = SPK2(x_arr, &y, m, gs1, edges1 + 1, &e);
+
+  for(unsigned int i = 0; i < edges1 + 1; i++)
+  {
+    element_snprintf(temp_string, 1000, "%B", gs1 + i);
+    strcat(hash_inp,temp_string);
+  }
+
+  element_snprintf(temp_string, 1000, "%B", y);
+  strcat(hash_inp,temp_string);
+
+  V = G1(e,true);
+  V = (y^p2->c[0]);
+  for(unsigned int i = 0; i < edges1 + 1; i++)
+  {
+    V *= gs1[i]^(p2->s[i]);
+  }
+
+  element_snprintf(temp_string, 1000, "%B", V);
+  strcat(hash_inp,temp_string);
+
+  strcat(hash_inp,m);
+
+  hash_inp_str = string(hash_inp);
+  strcpy(sha_outp,picosha2::hash256_hex_string(hash_inp_str).c_str());
+
+  c = Zr(e,sha_outp,strlen(sha_outp));
+
+  if(c == p2->c[0])
+    cout<<"SPK2 Verified"<<endl;
+  else
+    cout<<"SPK2 Verification Failed"<<endl;
+
+  ////////////////////////////////////////////////////SPK2 verification complete
+
+  /////////////////////////////////////////////////////////////////////SPK7 test
+  delete[] x_arr;
+
+  x_arr = new Zr[edges1 + 1 + 3];//2 S1s extra and one g1
+  G1 *y_arr = new G1[2];
+  y = G1(e,true);
+
+  G1 *g1_basis = new G1[edges1 + 1 + 1];//S1 extra added
+
+  unsigned int g1_count = edges1 + 2;
+  unsigned int y_count = 2;
+
+  for(unsigned int i = 0; i < edges1 + 1; i++)
+  {
+    g1_basis[i] = gs1[i];
+  }
+
+  g1_basis[edges1+1] = S1;
+
+  for(unsigned int i = 0; i < edges1 + 2; i++)
+  {
+    x_arr[i] = Zr(e,true);
+  }
+
+    x_arr[edges1 + 2] = x_arr[0];
+    x_arr[edges1 + 3] = Zr(e,true);
+
+  for(unsigned int i = 0; i < edges1 + 2; i++)
+  {
+    y *= g1_basis[i]^x_arr[i];
+  }
+  y_arr[0] = y;
+
+  y = G1(e,true);
+
+    y *= g1_basis[0]^x_arr[0];
+    y *= g1_basis[g1_count - 1]^x_arr[edges1 + 3];
+
+  y_arr[1] = y;
+
+  strcpy(hash_inp,"");
+  strcpy(m,"Test String");
+  struct zkproof *p7 = SPK7(x_arr, y_arr, 2, m, g1_basis, edges1 + 2,
+     edges1 + 4, edges1 + 3, &e);
+
+  ////////////////////////Verification
+  for(unsigned int i = 0; i < g1_count; i++)
+  {
+    element_snprintf(temp_string, 1000, "%B", g1_basis + i);
+    strcat(hash_inp,temp_string);
+  }
+
+  //y_arr feed
+  for(unsigned int i = 0; i < y_count; i++)
+  {
+    element_snprintf(temp_string, 1000, "%B", y_arr + i);
+    strcat(hash_inp,temp_string);
+  }
+
+  //J feed
+  for(unsigned int i = 0; i < g1_count-1; i++)
+  {
+    element_snprintf(temp_string, 1000, "%d,", i);
+    strcat(hash_inp,temp_string);
+  }
+  //Concatenating S_1
+    element_snprintf(temp_string, 1000, "%d|", g1_count-1);
+    strcat(hash_inp,temp_string);
+  //Concatenating g1
+    element_snprintf(temp_string, 1000, "%d,", 0);
+    strcat(hash_inp,temp_string);
+  //Concatenating S_1
+    element_snprintf(temp_string, 1000, "%d|", g1_count-1);
+    strcat(hash_inp,temp_string);
+
+  //e feed
+  for(unsigned int i = 0; i < g1_count-1; i++)
+  {
+    element_snprintf(temp_string, 1000, "%d,", i);
+    strcat(hash_inp,temp_string);
+  }
+  //Concatenating S_1
+    element_snprintf(temp_string, 1000, "%d|", g1_count-1);
+    strcat(hash_inp,temp_string);
+  //Concatenating g1
+    element_snprintf(temp_string, 1000, "%d,", 0);
+    strcat(hash_inp,temp_string);
+  //Concatenating S_1
+    element_snprintf(temp_string, 1000, "%d|", g1_count-1);
+    strcat(hash_inp,temp_string);
+
+  V = G1(e,true);
+
+  V *= y_arr[0]^p7->c[0];
+  for(unsigned int i = 0; i < p7->s_count-1; i++)
+  {
+    V *= (g1_basis[i])^p7->s[i];
+  }
+
+  element_snprintf(temp_string, 1000, "%B", V);
+  strcat(hash_inp,temp_string);
+
+  V = G1(e,true);
+
+  V = y_arr[1]^p7->c[0];
+
+    V *= (g1_basis[0])^p7->s[0];
+    V *= (g1_basis[g1_count-1])^p7->s[p7->s_count-1];
+
+  element_snprintf(temp_string, 1000, "%B", V);
+  strcat(hash_inp,temp_string);
+
+  strcat(hash_inp,m);
+
+  hash_inp_str = string(hash_inp);
+  strcpy(sha_outp,picosha2::hash256_hex_string(hash_inp_str).c_str());
+
+  c = Zr(e,sha_outp,strlen(sha_outp));
+
+  if(c == p7->c[0])
+    cout<<"SPK7 Verified"<<endl;
+  else
+    cout<<"SPK7 Verification Failed"<<endl;
+  ////////////////////////////////////////////////////SPK7 verification complete
+
+  
 }
 
 /*
