@@ -2,7 +2,8 @@
 #include <iostream>
 #include <math.h>
 #include "PBC.h"
-
+#include <string.h>
+#include "picosha2.h"
 using namespace std;
 
 //Function Prototypes
@@ -18,6 +19,13 @@ struct edge{
   corresponding index stored in (src/des). Product of prime labels stored in
   prod.
 */
+};
+
+struct zkproof{
+  Zr *c;
+  unsigned int c_count;
+  Zr *s;
+  unsigned int s_count;
 };
 
 mpz_class* getPrimes(int n)
@@ -261,6 +269,52 @@ G2 accumulate(const unsigned int edges2, Zr *pcoeff_E2, G2 *gs2, Pairing *e)
   return accE_2;
 }
 
+struct zkproof* SPK1(Zr *x, G1 *y, char *m, G1 *g1, Pairing *e)
+{
+  Zr r(*e,true);
+  G1 t(*e,true);
+  Zr c(*e,false);
+  Zr s(*e,false);
+
+
+  char temp_string[1000]; //TODO: Automate this length
+  char hash_inp[10000];
+  strcpy(hash_inp,"");
+
+  element_snprintf(temp_string, 1000, "%B", g1);
+  strcat(hash_inp,temp_string);
+
+  element_snprintf(temp_string, 1000, "%B", y);
+  strcat(hash_inp,temp_string);
+
+  t = (*g1)^r;
+  element_snprintf(temp_string, 1000, "%B", t);
+  strcat(hash_inp,temp_string);
+
+  strcat(hash_inp,m);//FIx this by using a SHA256 first maybe?
+  //cout<<hash_inp<<endl;
+
+  string hash_inp_str = string(hash_inp);
+  char sha_outp[64];
+  strcpy(sha_outp,picosha2::hash256_hex_string(hash_inp_str).c_str());
+
+  c = Zr(*e,sha_outp,strlen(sha_outp));
+
+  s = r - (c*(*x));
+
+  struct zkproof *p1 = new zkproof[1];
+  p1->c_count = 1;
+  p1->c = new Zr[1];
+  *(p1->c) = c;
+  p1->s = new Zr[1];
+  p1->s_count = 1;
+  *(p1->s) = s;
+  return p1;
+
+}
+
+//struct zkproof* SPK2(Zr *x, G1 *y, char *m, G1 *g1, Pairing *e)
+
 int main(void)
 {
   unsigned int topo = 5;
@@ -414,6 +468,52 @@ int main(void)
   //There seems to be an issue in deciding precedence without brackets
   C_rho_2 = (g2^pcoeff_E2[edges2]) * (S2^r_rho_2);
   C_E_2 = accE_2 * S2^r_E_2;//Prover
+
+  ////////////////////////////////////////////////////////////////Setup Complete
+
+  Zr x(e,true);
+  G1 y(e,false);
+  y = (g1^x);
+  char m[1000];
+  strcpy(m,"Test String");
+  struct zkproof *p1 = SPK1(&x, &y, m, &g1, &e);
+  //----------------------------------------------------------------------------
+
+
+  G1 V(e,false);
+  Zr c(e,true);
+
+  char temp_string[10000]; //TODO: Automate this length
+  char hash_inp[100000];
+  strcpy(hash_inp,"");
+
+  element_snprintf(temp_string, 10000, "%B", g1);
+  strcat(hash_inp,temp_string);
+
+  element_snprintf(temp_string, 10000, "%B", y);
+  strcat(hash_inp,temp_string);
+
+  V = (g1^(p1->s[0])) * (y^(p1->c[0]));
+  //V = (g1^(p1->c[0])) * (y^(p1->s[0]));
+  element_snprintf(temp_string, 10000, "%B", V);
+  strcat(hash_inp,temp_string);
+
+  strcat(hash_inp,m);
+
+  string hash_inp_str = string(hash_inp);
+  char sha_outp[64];
+  strcpy(sha_outp,picosha2::hash256_hex_string(hash_inp_str).c_str());
+
+  c = Zr(e,sha_outp,strlen(sha_outp));
+
+  //element_from_hash does not seem to be a secure cryptographic hash function
+  //Hence bootstrapping with sha256 which seems to prevent false verifications
+  //with overwhelming probability.
+
+  if(c == p1->c[0])
+    cout<<"Verified"<<endl;
+  else
+    cout<<"Verification Failed"<<endl;
 
 
 }
