@@ -4,6 +4,7 @@
 #include "PBC.h"
 #include <string.h>
 #include "picosha2.h"
+#include <ctime>
 using namespace std;
 
 //Function Prototypes
@@ -276,22 +277,25 @@ struct zkproof* SPK1(Zr *x, G1 *y, char *m, G1 *g1, Pairing *e)
   Zr s(*e,false);
 
 
-  char temp_string[1000]; //TODO: Automate this length
-  char hash_inp[10000];
+  unsigned int temp_string_leng = 10000;
+  unsigned int hash_inp_leng = temp_string_leng*10;
+
+  char *temp_string = new char[temp_string_leng]; //TODO: Automate this length
+  char *hash_inp = new char[hash_inp_leng];
+
   strcpy(hash_inp,"");
 
-  element_snprintf(temp_string, 1000, "%B", g1);
+  element_snprintf(temp_string, temp_string_leng, "%B", g1);
   strcat(hash_inp,temp_string);
 
-  element_snprintf(temp_string, 1000, "%B", y);
+  element_snprintf(temp_string, temp_string_leng, "%B", y);
   strcat(hash_inp,temp_string);
 
   t = (*g1)^r;
-  element_snprintf(temp_string, 1000, "%B", t);
+  element_snprintf(temp_string, temp_string_leng, "%B", t);
   strcat(hash_inp,temp_string);
 
-  strcat(hash_inp,m);//FIx this by using a SHA256 first maybe?
-  //cout<<hash_inp<<endl;
+  strcat(hash_inp,m);
 
   string hash_inp_str = string(hash_inp);
   char sha_outp[64];
@@ -310,6 +314,7 @@ struct zkproof* SPK1(Zr *x, G1 *y, char *m, G1 *g1, Pairing *e)
   *(p1->s) = s;
   return p1;
 
+
 }
 
 struct zkproof* SPK1(Zr *x, G2 *y, char *m, G2 *g2, Pairing *e)
@@ -320,8 +325,12 @@ struct zkproof* SPK1(Zr *x, G2 *y, char *m, G2 *g2, Pairing *e)
   Zr s(*e,false);
 
 
-  char temp_string[1000]; //TODO: Automate this length
-  char hash_inp[10000];
+  unsigned int temp_string_leng = 10000;
+  unsigned int hash_inp_leng = temp_string_leng*10;
+
+  char *temp_string = new char[temp_string_leng]; //TODO: Automate this length
+  char *hash_inp = new char[hash_inp_leng];
+
   strcpy(hash_inp,"");
 
   element_snprintf(temp_string, 1000, "%B", g2);
@@ -368,8 +377,11 @@ struct zkproof* SPK2(Zr *x, G1 *y, char *m, G1 *gs1, unsigned int k, Pairing *e)
     r[i] = Zr(*e,true);
   }
 
-  char temp_string[1000]; //TODO: Automate this length
-  char hash_inp[10000];
+  unsigned int temp_string_leng = 10000;
+  unsigned int hash_inp_leng = temp_string_leng*10;
+
+  char *temp_string = new char[temp_string_leng]; //TODO: Automate this length
+  char *hash_inp = new char[hash_inp_leng];
   strcpy(hash_inp,"");
 
   for(unsigned int i = 0; i < k; i++)
@@ -432,8 +444,11 @@ struct zkproof* SPK7(Zr *x_arr, G1 *y_arr, unsigned int y_count, char *m,
     r[i] = Zr(*e,true);
   }
 
-  char temp_string[1000]; //TODO: Automate this length
-  char hash_inp[10000];
+  unsigned int temp_string_leng = 10000;
+  unsigned int hash_inp_leng = temp_string_leng*10;
+
+  char *temp_string = new char[temp_string_leng]; //TODO: Automate this length
+  char *hash_inp = new char[hash_inp_leng];
   strcpy(hash_inp,"");
 
   //basis feed
@@ -533,7 +548,7 @@ struct zkproof* SPK7(Zr *x_arr, G1 *y_arr, unsigned int y_count, char *m,
 
 int main(void)
 {
-  unsigned int topo = 5;
+  unsigned int topo = 20;
   const unsigned int vertices1 = topo, vertices2 = topo, edges1 = topo, edges2 = topo;//Prover
   const unsigned int vertices = vertices1 + vertices2, edges = edges1 + edges2;//Prover
   const mpz_class *prime_arr = getPrimes(vertices);//Prover
@@ -566,7 +581,7 @@ int main(void)
   //writing the parameters to a file "my a.param" first and then
   //reading from the same using the C++ parameter init function
   pbc_param_t par;
-  pbc_param_init_a_gen(par, 160, 512);
+    pbc_param_init_a_gen(par, 1792, 2048);
 
 
   pairing_t e_temp;
@@ -685,38 +700,46 @@ int main(void)
   C_rho_2 = (g2^pcoeff_E2[edges2]) * (S2^r_rho_2);
   C_E_2 = accE_2 * (S2^r_E_2);//Prover
 
-
   ////////////////////////////////////////////////////////////////Setup Complete
 
   /////////////////////////////////////////////////////////////////////SPK1 test
+/*
 {
   Zr x(e,true);
   G1 y(e,true);
   y = (g1^x);
   char m[1000];
   strcpy(m,"Test String");
+  //SPK1(&x, &y, m, &g1, &e);
   struct zkproof *p1 = SPK1(&x, &y, m, &g1, &e);
   //----------------------------------------------------------------------------
+
   G1 V(e,true);
   Zr c(e,false);
 
-  char temp_string[1000]; //TODO: Automate this length
-  char hash_inp[10000];
+  unsigned int temp_string_leng = 10000;
+  unsigned int hash_inp_leng = temp_string_leng*10;
+
+  char *temp_string = new char[temp_string_leng]; //TODO: Automate this length
+  char *hash_inp = new char[hash_inp_leng];
+
+
   strcpy(hash_inp,"");
 
-  element_snprintf(temp_string, 10000, "%B", g1);
+  element_snprintf(temp_string, temp_string_leng, "%B", g1);
   strcat(hash_inp,temp_string);
 
-  element_snprintf(temp_string, 10000, "%B", y);
+  element_snprintf(temp_string, temp_string_leng, "%B", y);
   strcat(hash_inp,temp_string);
 
   V = (g1^(p1->s[0])) * (y^(p1->c[0]));
   //V = (g1^(p1->c[0])) * (y^(p1->s[0]));
-  element_snprintf(temp_string, 10000, "%B", V);
+
+  element_snprintf(temp_string, temp_string_leng, "%B", V);
   strcat(hash_inp,temp_string);
 
   strcat(hash_inp,m);
-
+  cout<<"hash_inp length:"<<strlen(hash_inp)<<endl;
   string hash_inp_str = string(hash_inp);
   char sha_outp[64];
   strcpy(sha_outp,picosha2::hash256_hex_string(hash_inp_str).c_str());
@@ -733,6 +756,7 @@ int main(void)
     cout<<"SPK1 Verification Failed"<<endl;
 
 }
+
   ////////////////////////////////////////////////////SPK1 verification complete
 
   /////////////////////////////////////////////////////////////////////SPK2 test
@@ -742,8 +766,11 @@ int main(void)
   char m[1000];
   strcpy(m,"Test String");
 
-  char temp_string[1000]; //TODO: Automate this length
-  char hash_inp[10000];
+  unsigned int temp_string_leng = 10000;
+  unsigned int hash_inp_leng = temp_string_leng*10;
+
+  char *temp_string = new char[temp_string_leng]; //TODO: Automate this length
+  char *hash_inp = new char[hash_inp_leng];
   strcpy(hash_inp,"");
 
   for(unsigned int i = 0; i < edges1 + 1; i++)
@@ -792,8 +819,8 @@ int main(void)
   ////////////////////////////////////////////////////SPK2 verification complete
 
   /////////////////////////////////////////////////////////////////////SPK7 test
-{
 
+{
   Zr *x_arr = new Zr[edges1 + 1 + 3];//2 S1s extra and one g1
   G1 *y_arr = new G1[2];
   G1 *g1_basis = new G1[edges1 + 1 + 1];//S1 extra added
@@ -835,8 +862,11 @@ int main(void)
      edges1 + 4, edges1 + 3, &e);
 
   ////////////////////////Verification
-  char temp_string[1000]; //TODO: Automate this length
-  char hash_inp[10000];
+  unsigned int temp_string_leng = 10000;
+  unsigned int hash_inp_leng = temp_string_leng*10;
+
+  char *temp_string = new char[temp_string_leng]; //TODO: Automate this length
+  char *hash_inp = new char[hash_inp_leng];
   strcpy(hash_inp,"");
 
   for(unsigned int i = 0; i < g1_count; i++)
@@ -919,9 +949,11 @@ int main(void)
   else
     cout<<"SPK7 Verification Failed"<<endl;
 }
+*/
   ////////////////////////////////////////////////////SPK7 verification complete
 
   /////////////////////////////////////////////////////SPK7 test using polyCoeff
+int start_s=clock();
 {
   Zr *x_arr = new Zr[edges1 + 1 + 3];//2 S1s extra and one g1
   G1 *y_arr = new G1[2];
@@ -955,8 +987,11 @@ int main(void)
      edges1 + 4, edges1 + 3, &e);
 
   ////////////////////////Verification
-  char temp_string[1000]; //TODO: Automate this length
-  char hash_inp[10000];
+  unsigned int temp_string_leng = 10000;
+  unsigned int hash_inp_leng = temp_string_leng*10;
+
+  char *temp_string = new char[temp_string_leng]; //TODO: Automate this length
+  char *hash_inp = new char[hash_inp_leng];
   strcpy(hash_inp,"");
 
   for(unsigned int i = 0; i < g1_count; i++)
@@ -1039,7 +1074,10 @@ int main(void)
   else
     cout<<"SPK7 using polyCoeff Verification Failed"<<endl;
 }
+int stop_s=clock();
+cout << "SPK 7 time: " << (stop_s-start_s)/double(CLOCKS_PER_SEC)*1000 << endl;
   ////////////////////////////////////SPK7 verification using polyCoeff complete
+  
 }
 
 /*
